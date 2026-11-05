@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>1000 СЭТГЭЛ — Админ</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Nunito:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="brand"><img class="logo" src="logo.png" alt="ШУТИС ДаТС"><span class="brand-txt"><i>❤</i> 1000 СЭТГЭЛ · Админ</span></div>
+    <a class="btn" href="/" style="text-decoration:none">LIVE дэлгэц</a>
+  </div>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <form class="login" id="login">
+    <h2 style="margin:0;font-family:var(--display)">Админ нэвтрэх</h2>
+    <div><label for="pw">Нууц үг</label><input type="password" id="pw" autocomplete="current-password" style="width:100%;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px"></div>
+    <div class="err" id="loginErr" hidden></div>
+    <button class="btn primary lg" type="submit">Нэвтрэх</button>
+  </form>
+
+  <section id="panel" hidden>
+    <div class="admin-head">
+      <div><div class="eyebrow">Админ хэсэг</div><h2>Хандивын бүртгэл</h2></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="refresh">Шинэчлэх</button>
+        <button class="btn" id="csv">CSV татах</button>
+        <button class="btn" id="logout">Гарах</button>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><span>Зүрх (1,000₮)</span><b id="kHearts">0</b></div>
+      <div class="kpi"><span>Нийт дүн</span><b id="kSum">0₮</b></div>
+      <div class="kpi"><span>Хүлээгдэж буй</span><b id="kPend">0</b></div>
+      <div class="kpi"><span>Дансаар</span><b id="kBank">0</b></div>
+    </div>
+    <form class="manual" id="manual">
+      <h4>Дансаар орсон гүйлгээ нэмэх (утга: 1000 СЭТГЭЛ). Банкны хуулгаас шалгаад нэмнэ үү.</h4>
+      <div><label for="mName">Нэр / гүйлгээний утга</label><input type="text" id="mName" required></div>
+      <div><label for="mCount">Хэдэн 1,000₮ (жишээ 3,000₮ → 3)</label><input type="text" id="mCount" inputmode="numeric" value="1"></div>
+      <button class="btn gold" type="submit">Баталгаажуулж нэмэх</button>
+      <span class="note" id="mMsg"></span>
+    </form>
+    <div class="tools">
+      <div class="grow"><label for="q">Хайх</label><input type="text" id="q" placeholder="Нэр, нэхэмжлэх…"></div>
+      <div><label for="fStatus">Төлөв</label>
+        <select id="fStatus"><option value="">Бүгд</option><option value="paid">Төлөгдсөн</option><option value="pending">Хүлээгдэж буй</option><option value="expired">Цуцлагдсан</option></select></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Огноо</th><th>Нэр</th><th>Мэндчилгээ</th><th>Арга</th><th>QPay нэхэмжлэх</th><th class="num">Дүн</th><th>Төлөв</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  const KEY = "setgel_admin";
+  let pw = ""; try { pw = sessionStorage.getItem(KEY) || ""; } catch {}
+  let rows = [];
+  const label = { paid: "Төлөгдсөн", pending: "Хүлээгдэж буй", expired: "Цуцлагдсан" };
+
+  async function api(method, body) {
+    const res = await fetch("/api/admin", {
+      method, headers: { "x-admin-key": pw, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) throw Object.assign(new Error("Нууц үг буруу"), { auth: true });
+    if (!res.ok) throw new Error(data.error || "Алдаа");
+    return data;
+  }
+
+  async function load() {
+    try {
+      const data = await api("GET");
+      rows = data.rows;
+      document.getElementById("login").hidden = true;
+      document.getElementById("panel").hidden = false;
+      const paid = rows.filter((r) => r.status === "paid");
+      const sum = paid.reduce((a, r) => a + r.amount, 0);
+      document.getElementById("kHearts").textContent = U.fmt(data.stats.hearts);
+      document.getElementById("kSum").textContent = U.fmt(sum) + "₮";
+      document.getElementById("kPend").textContent = U.fmt(rows.filter((r) => r.status === "pending").length);
+      document.getElementById("kBank").textContent = U.fmt(paid.filter((r) => r.method === "bank").length);
+      render();
+    } catch (e) {
+      if (e.auth) { try { sessionStorage.removeItem(KEY); } catch {} showLogin(e.message); }
+      else alert(e.message);
+    }
+  }
+
+  function render() {
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    const fs = document.getElementById("fStatus").value;
+    const tb = document.getElementById("rows"); tb.innerHTML = "";
+    rows.filter((r) => (!fs || r.status === fs) && (!q || `${r.name} ${r.message} ${r.qpay_invoice_id}`.toLowerCase().includes(q)))
+      .forEach((r) => {
+        const tr = document.createElement("tr");
+        const d = new Date(r.paid_at || r.created_at);
+        tr.innerHTML = `<td class="mono">${d.toLocaleDateString("mn-MN")} ${U.time(d)}</td>
+          <td>${U.esc(r.name || "—")}</td><td>${U.esc(r.message || "—")}</td>
+          <td class="method">${r.method === "bank" ? "Данс" : "QPay"}</td>
+          <td class="mono">${U.esc(r.qpay_invoice_id || "—")}</td>
+          <td class="num">${U.fmt(r.amount)}₮</td>
+          <td><span class="pill ${r.status}">${label[r.status]}</span></td>`;
+        tb.appendChild(tr);
+      });
+  }
+
+  function showLogin(msg) {
+    document.getElementById("panel").hidden = true;
+    document.getElementById("login").hidden = false;
+    const e = document.getElementById("loginErr"); e.hidden = !msg; e.textContent = msg || "";
+  }
+
+  document.getElementById("login").addEventListener("submit", (e) => {
+    e.preventDefault(); pw = document.getElementById("pw").value;
+    try { sessionStorage.setItem(KEY, pw); } catch {}
+    load();
+  });
+  document.getElementById("logout").onclick = () => { pw = ""; try { sessionStorage.removeItem(KEY); } catch {} showLogin(); };
+  document.getElementById("refresh").onclick = load;
+  document.getElementById("q").addEventListener("input", render);
+  document.getElementById("fStatus").addEventListener("change", render);
+
+  document.getElementById("manual").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("mMsg");
+    try {
+      await api("POST", { name: document.getElementById("mName").value, count: document.getElementById("mCount").value });
+      msg.textContent = "Нэмэгдлээ — LIVE дэлгэц дээр гарлаа.";
+      document.getElementById("mName").value = ""; document.getElementById("mCount").value = "1";
+      load();
+    } catch (err) { msg.textContent = err.message; }
+  });
+
+  document.getElementById("csv").onclick = () => {
+    const head = "created_at,paid_at,name,message,method,amount,status,qpay_invoice_id,qpay_payment_id";
+    const lines = rows.map((r) => [r.created_at, r.paid_at, r.name, r.message, r.method, r.amount, r.status, r.qpay_invoice_id, r.qpay_payment_id]
+      .map((v) => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(","));
+    const blob = new Blob(["﻿" + [head, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "1000-setgel-" + new Date().toISOString().slice(0, 10) + ".csv"; a.click();
+  };
+
+  if (pw) load(); else showLogin();
+  setInterval(() => { if (pw && !document.getElementById("panel").hidden) load(); }, 30000);
+})();
+</script>
+</body>
+</html>
