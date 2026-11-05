@@ -1,15 +1,17 @@
 # 1000 СЭТГЭЛ — LIVE хандивын систем
 
 ШУТИС ДаТС-ийн Оюутны зөвлөлд зориулсан, Урлагийн их наадмын хандивын систем.
-Хандив орж ирэх бүрд LIVE дэлгэц дээр нэг зүрх нэмэгдэнэ.
+QPay хэрэггүй: хандив таны **банкны данс** руу орно, та нэг товчоор баталгаажуулахад LIVE дэлгэц дээр зүрх нэмэгдэнэ.
 
 ```
-Оюутан /donate → QPay QR-аар 1,000₮ төлнө
-        → QPay callback  ─┐
-        → утас 3с тутам   ├→ сервер QPay-ээс төлбөрийг ДАХИН шалгана
-                          ┘   → Supabase: donations.status = 'paid' (нэг удаа)
-                              → trigger → supporters мөр нэмнэ
-                              → Realtime → LIVE дэлгэц +1 ❤
+Оюутан QR уншуулна → /donate
+   1) данс руу 1,000₮ шилжүүлнэ (утга: "1000 СЭТГЭЛ Нэр")
+   2) "Шилжүүлсэн ❤" дарж нэрээ мэдэгдэнэ
+          ↓
+Админ /admin → "Баталгаажуулах" жагсаалт
+   банкны апп-аасаа гүйлгээг хараад  [✓ Орсон]  эсвэл  [✗ Ороогүй]
+          ↓
+Supabase → supporters → Realtime → LIVE дэлгэц +1 ❤  (оюутны утсанд ч "тодорлоо" гэж гарна)
 ```
 
 ## Хуудсууд
@@ -17,60 +19,56 @@
 | Хаяг | Юу вэ |
 |---|---|
 | `/` | LIVE дэлгэц (проектор). Neon тоолуур, 1000 зүрх, QR, сүүлийн дэмжигчид |
-| `/donate` | Оюутны утсан дээрх хандивын хуудас (QPay + дансны мэдээлэл) |
-| `/admin` | Жагсаалт, тайлан, CSV, дансаар орсон хандивыг гараар нэмэх |
+| `/donate` | Оюутны утсан дээрх хуудас: дансны мэдээлэл + "Шилжүүлсэн" мэдэгдэл |
+| `/admin` | Баталгаажуулах дараалал, жагсаалт, CSV, шууд нэмэх |
 
 ## Файлын бүтэц
 
 ```
-public/            вэб хуудсууд (index, donate, admin, style.css, config.js, logo.png)
-netlify/functions/ сервер функцууд (create-invoice, qpay-callback, check-payment, admin)
-netlify/lib/       QPay ба Supabase туслах код
-supabase/schema.sql өгөгдлийн сангийн схем
+public/             вэб хуудсууд (index, donate, admin, style.css, config.js, logo.png)
+netlify/functions/  claim.js (хандивлагчийн мэдэгдэл), admin.js (админ)
+netlify/lib/db.js   Supabase холболт
+supabase/schema.sql өгөгдлийн сан
 ```
 
-## Суулгах алхам
+## Суулгах (≈20 минут, бүгд үнэгүй)
 
-### 1. QPay merchant эрх
-QPay-тэй гэрээ байгуулж **username, password, invoice_code** авна.
-Эхлээд sandbox (`https://merchant-sandbox.qpay.mn`) дээр туршина.
-QPay-ээс өгсөн API баримт бичигтэй `netlify/lib/qpay.js`-ийн endpoint, талбаруудыг заавал тулгаж шалгаарай.
+### 1. Supabase
+1. supabase.com дээр бүртгүүлж шинэ төсөл үүсгэнэ.
+2. **SQL Editor** → `supabase/schema.sql`-ийг бүтнээр нь хуулж **Run** дарна.
+3. **Project Settings → API**-аас `Project URL`, `anon` key, `service_role` key-г хуулж авна.
 
-### 2. Supabase
-1. supabase.com дээр шинэ төсөл үүсгэнэ.
-2. **SQL Editor** → `supabase/schema.sql`-ийг бүтнээр нь хуулж ажиллуулна.
-3. **Project Settings → API**-аас `Project URL`, `anon` key, `service_role` key-г авна.
+### 2. Тохиргоо — `public/config.js`
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (anon түлхүүр л — service_role хэзээ ч биш)
+- `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` — **өөрийн данс**
+- `DONATE_URL` — 3-р алхмын дараа Netlify-ийн өгсөн хаяг + `/donate`
 
-### 3. Тохиргоо
-`public/config.js`-д **зөвхөн** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `DONATE_URL`-г бичнэ.
-(`service_role` түлхүүрийг энд хэзээ ч бүү тавь.)
+### 3. Netlify
+1. Энэ хавтсыг GitHub руу оруулаад Netlify дээр **Add new site → Import from Git**.
+   (GitHub ашиглахгүй бол: `npm i` → `npx netlify-cli deploy --prod`)
+2. **Site configuration → Environment variables**:
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD` (хүчтэй нууц үг), `DONATION_AMOUNT=1000`
+3. **Deploys → Trigger deploy**.
+4. `config.js` дахь `DONATE_URL`-г шинэ хаягаар засаад дахин deploy хийнэ.
 
-### 4. Netlify
-1. Энэ хавтсыг GitHub руу оруулаад Netlify дээр **Add new site → Import** хийнэ
-   (эсвэл `npm i` → `npx netlify deploy --prod`).
-2. **Site configuration → Environment variables**-д `.env.example`-ийн бүх утгыг оруулна.
-   `SITE_URL`-д Netlify-ийн өгсөн хаягийг (жишээ `https://1000setgel.netlify.app`) бичнэ.
-3. Дахин deploy хийнэ.
+### 4. Турших
+1. Утсаараа `/donate` нээж "Шилжүүлсэн" мэдэгдэл илгээнэ.
+2. `/admin` → **✓ Орсон** дарна.
+3. `/` LIVE дэлгэц дээр +1 ❤ гарна, утсан дээр "Таны зүрх тодорлоо!" гарна.
 
-### 5. Турших
-1. `/donate` нээж sandbox дээр 1,000₮ төлнө.
-2. `/` LIVE дэлгэц дээр +1 ❤ гарч байгааг шалгана.
-3. `/admin`-д нууц үгээрээ орж бүртгэлийг харна.
+## Наадмын өдөр
 
-Локал дээр: `npm i` → `.env.example`-ийг `.env` болгон хуулж бөглөөд → `npm run dev`.
-(QPay callback локал хаяг руу ирэхгүй тул утасны 3 секундын шалгалт ажиллана.)
+- Нэг хүн (та) утсаараа `/admin` нээгээд, банкны апп-аа зэрэгцүүлэн харж байна.
+- Мэдэгдэл бүрийг банкны гүйлгээтэй тулгана: нэр, дүн таарвал **✓ Орсон**. 3,000₮ орсон бол зүрхний тоог 3 болгоод баталгаажуулна.
+- Мэдэгдэлгүй орсон гүйлгээг "Шууд нэмэх" хэсгээр нэмнэ.
+- Мөнгө ороогүй мэдэгдлийг **✗ Ороогүй** — оюутны утсанд "олдсонгүй" гэж гарна.
 
 ## Аюулгүй байдал
 
-- Callback-д **итгэхгүй**: сервер QPay-ээс өөрөөс нь `payment/check` хийж баталгаажуулна.
-- Нэг төлбөр 2 удаа тоологдохгүй: `status<>'paid'` нөхцөлтэй update + `qpay_payment_id UNIQUE` + `supporters.donation_id UNIQUE`.
-- `donations` хүснэгтийг гаднаас уншиж болохгүй (RLS). LIVE дэлгэц зөвхөн `supporters` (нэр, мэндчилгээ)-ийг уншина.
+- Хуурамч мэдэгдэл дэлгэцэнд гарахгүй: зөвхөн админ баталгаажуулсан нь л гарна.
+- `donations` хүснэгтийг гаднаас уншиж болохгүй (RLS). LIVE дэлгэц зөвхөн `supporters`-ийг уншина.
+- Нэг мэдэгдлийг 2 удаа баталгаажуулсан ч 1 л удаа тоологдоно.
 - Дэлгэц дээр нэр нууцлагдана: `Э.Оюун` → `Оюу-Э**`.
-- Админ API нууц үгээр хамгаалагдсан. Хүчтэй нууц үг тавиарай.
 
-## Дансаар орсон хандив
-Банкны шилжүүлэг автоматаар илрэхгүй. Админ банкны хуулгаас **"1000 СЭТГЭЛ"** утгатай гүйлгээг шалгаад
-`/admin` → "Дансаар орсон гүйлгээ нэмэх" хэсгээр нэмнэ (3,000₮ бол 3 гэж бичнэ → 3 зүрх).
-
-## Зорилгын тоо, дүнг өөрчлөх
-`public/config.js` → `GOAL`, `AMOUNT`; сервер талд `DONATION_AMOUNT` орчны хувьсагч.
+## Зорилго, дүнг өөрчлөх
+`public/config.js` → `GOAL`, `AMOUNT`; сервер талд `DONATION_AMOUNT`.

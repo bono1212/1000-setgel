@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fff7e6">
+<title>1000 СЭТГЭЛ — Хандивлах</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Nunito:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="donate-page">
+<div class="wrap narrow">
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+  <main class="phone solo" id="phone" aria-live="polite"></main>
+  <p class="note" style="text-align:center;margin-top:16px">#1000Сэтгэл · #ДүүрэнДэмжлэг · #МанайБаг · #УрлагийнИхНаадам</p>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  const C = window.APP_CONFIG;
+  const phone = document.getElementById("phone");
+  const KEY = "setgel_claim";
+  let pollTimer = null;
+
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } },
+    set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch {} },
+    clear() { try { localStorage.removeItem(KEY); } catch {} },
+  };
+
+  const head = `
+    <img class="phone-logo" src="logo.png" alt="ШУТИС ДаТС">
+    <div><div class="kicker">Урлагийн их наадам</div>
+    <h2>ДҮҮРЭН ДЭМЖЛЭГ <em>1000 СЭТГЭЛ</em> ❤</h2></div>`;
+
+  function viewForm(err, keep) {
+    stopPoll();
+    phone.innerHTML = `${head}
+      <p>Чиний илгээсэн 1,000₮ бол зүгээр нэг хандив биш.</p>
+      <div class="equation">1 ОЮУТАН = 1,000₮ = 1 ДЭМЖЛЭГ</div>
+
+      <div class="bank-card" style="border-top:0;padding-top:0">
+        <b>1. Энэ данс руу 1,000₮ шилжүүл</b>
+        ${C.BANK_NAME ? `<div class="kv"><span>Банк</span><span>${U.esc(C.BANK_NAME)}</span></div>` : ""}
+        <div class="kv"><span>Данс</span><code>${U.esc(C.BANK_ACCOUNT)}</code></div>
+        <div class="kv"><span>Хүлээн авагч</span><span>${U.esc(C.BANK_HOLDER)}</span></div>
+        <div class="kv"><span>Гүйлгээний утга</span><code>${U.esc(C.BANK_NOTE)} + нэр</code></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" type="button" id="cpAcct">Данс хуулах</button>
+          <button class="btn" type="button" id="cpNote">Утга хуулах</button>
+        </div>
+        <span class="note">Утганд нэрээ бич (жишээ: "${U.esc(C.BANK_NOTE)} Оюун"). Ингэвэл бид таны гүйлгээг хурдан олно.</span>
+      </div>
+
+      <form id="cForm" class="bank-card" style="gap:12px" novalidate>
+        <b>2. Шилжүүлсэн бол энд мэдэгд</b>
+        <div><label for="cName">Нэр (дэлгэц дээр "Оюу-Э**" гэж нууцлагдана)</label>
+          <input type="text" id="cName" maxlength="40" autocomplete="name" placeholder="Жишээ: Э.Оюун" required></div>
+        <div><label for="cMsg">Багтаа хэлэх үг (заавал биш)</label>
+          <input type="text" id="cMsg" maxlength="60" placeholder="Тайзыг эзэгнээрэй!"></div>
+        <div><label for="cCount">Шилжүүлсэн дүн</label>
+          <select id="cCount">
+            <option value="1">1,000₮ — 1 зүрх</option><option value="2">2,000₮ — 2 зүрх</option>
+            <option value="3">3,000₮ — 3 зүрх</option><option value="5">5,000₮ — 5 зүрх</option>
+            <option value="10">10,000₮ — 10 зүрх</option><option value="20">20,000₮ — 20 зүрх</option>
+          </select></div>
+        <input type="text" name="website" id="cWeb" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+        ${err ? `<div class="err">${U.esc(err)}</div>` : ""}
+        <button class="btn primary lg" type="submit" id="sendBtn">Шилжүүлсэн ❤</button>
+      </form>`;
+    if (keep) {
+      document.getElementById("cName").value = keep.name || "";
+      document.getElementById("cMsg").value = keep.message || "";
+      document.getElementById("cCount").value = keep.count || "1";
+    }
+    document.getElementById("cpAcct").onclick = (e) => U.copy(C.BANK_ACCOUNT.replace(/\s/g, ""), e.target);
+    document.getElementById("cpNote").onclick = (e) => U.copy(C.BANK_NOTE, e.target);
+    document.getElementById("cForm").addEventListener("submit", onSubmit);
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    const d = {
+      name: document.getElementById("cName").value.trim(),
+      message: document.getElementById("cMsg").value.trim(),
+      count: document.getElementById("cCount").value,
+      website: document.getElementById("cWeb").value,
+    };
+    if (!d.name) return viewForm("Нэрээ оруулна уу.", d);
+    const btn = document.getElementById("sendBtn");
+    btn.disabled = true; btn.textContent = "Илгээж байна…";
+    try {
+      const res = await fetch("/api/claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Алдаа гарлаа");
+      const claim = { id: data.id, name: d.name, count: Number(d.count), t: Date.now() };
+      store.set(claim);
+      viewWaiting(claim);
+    } catch (err) {
+      viewForm(err.message || "Сүлжээний алдаа. Дахин оролдоно уу.", d);
+    }
+  }
+
+  function viewWaiting(c) {
+    phone.innerHTML = `
+      <div class="success">
+        <div class="spinner"></div>
+        <h2>Баярлалаа, ${U.esc(c.name)}!</h2>
+        <p>Мэдэгдлийг хүлээн авлаа. Бид дансаа шалгаад баталгаажуулмагц таны ${c.count > 1 ? c.count + " зүрх" : "зүрх"} LIVE дэлгэц дээр тодорно.</p>
+        <p class="note">Энэ хуудсыг хааж болно.</p>
+        <a class="btn lg" href="/" style="text-align:center;text-decoration:none">LIVE дэлгэц харах</a>
+        <button class="btn" id="newBtn">Дахин дэмжих</button>
+      </div>`;
+    document.getElementById("newBtn").onclick = () => { store.clear(); viewForm(); };
+    startPoll(c);
+  }
+
+  function viewDone(c) {
+    stopPoll(); store.clear();
+    phone.innerHTML = `
+      <div class="success">
+        <div class="heart">❤</div>
+        <h2>Таны зүрх тодорлоо!</h2>
+        <p>${U.esc(c.name)}, таны дэмжлэг LIVE дэлгэц дээр гарлаа.</p>
+        <p><b>🔥 ЧИ Ч БАС МАНАЙ БАГИЙН НЭГ ХЭСЭГ!</b></p>
+        <a class="btn primary lg" href="/" style="text-align:center;text-decoration:none">LIVE дэлгэц харах</a>
+        <button class="btn" id="again">Дахин дэмжих</button>
+      </div>`;
+    document.getElementById("again").onclick = () => viewForm();
+  }
+
+  async function check(c) {
+    if (!c.id) return;
+    try {
+      const r = await fetch("/api/claim?id=" + encodeURIComponent(c.id)).then((x) => x.json());
+      if (r.status === "paid") viewDone(c);
+      else if (r.status === "expired") { store.clear(); viewForm("Таны гүйлгээ дансанд олдсонгүй. Шилжүүлгээ шалгаад дахин мэдэгдэнэ үү."); }
+    } catch {}
+  }
+  function startPoll(c) { stopPoll(); pollTimer = setInterval(() => check(c), 10000); check(c); }
+  function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+
+  const c = store.get();
+  if (c && Date.now() - c.t < 24 * 3600 * 1000) viewWaiting(c); else { store.clear(); viewForm(); }
+})();
+</script>
+</body>
+</html>
