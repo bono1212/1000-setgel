@@ -1,7 +1,7 @@
-import { db, json, clean, clampCount, isUuid, AMOUNT } from "../lib/db.js";
+import { db, json, clean, isUuid, parseAmount, AMOUNT } from "../lib/db.js";
 
 // Хандивлагч "Шилжүүлсэн" гэж мэдэгдэнэ → админ баталгаажуулах жагсаалтад орно.
-//   POST { name, message, count }  → { id }
+//   POST { name, message, amount }  → { id }   (amount ₮, 1,000-аас дээш дурын дүн)
 //   GET  ?id=...                   → { status }   (хандивлагчийн утас баталгаажсан эсэхийг асууна)
 export default async (req) => {
   if (req.method === "GET") {
@@ -19,12 +19,13 @@ export default async (req) => {
 
   const name = clean(body.name, 40);
   const message = clean(body.message, 60);
-  const count = clampCount(body.count, 20);
+  const amount = parseAmount(body.amount, body.count);
   if (!name) return json({ error: "Нэрээ оруулна уу" }, 400);
+  if (!amount) return json({ error: `Дүн хамгийн багадаа ${AMOUNT.toLocaleString("en-US")}₮ байна` }, 400);
 
   const { data, error } = await db
     .from("donations")
-    .insert({ name, message, amount: AMOUNT * count, method: "bank", status: "pending" })
+    .insert({ name, message, amount, method: "bank", status: "pending" })
     .select("id")
     .single();
   if (error) return json({ error: "Хадгалж чадсангүй. Дахин оролдоно уу." }, 500);
