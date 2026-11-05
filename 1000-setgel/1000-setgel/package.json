@@ -1,0 +1,16 @@
+{
+  "name": "1000-setgel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ШУТИС ДаТС — 1000 СЭТГЭЛ LIVE хандивын систем (Netlify + Supabase + QPay)",
+  "scripts": {
+    "dev": "npx netlify-cli dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
