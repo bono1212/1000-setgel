@@ -70,7 +70,7 @@
 (async function () {
   const C = window.APP_CONFIG, GOAL = C.GOAL;
   const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
-  let hearts = 0, people = 0, recent = []; // recent: newest first
+  let hearts = 0, people = 0, total = 0, recent = []; // recent: newest first
   const seen = new Set();
 
   // Зүрхний самбар
@@ -87,7 +87,7 @@
     big.textContent = U.fmt(hearts);
     if (fresh) { big.classList.remove("bump"); void big.offsetWidth; big.classList.add("bump"); }
     document.getElementById("meter").style.width = (shown / GOAL) * 100 + "%";
-    document.getElementById("sTotal").textContent = U.fmt(hearts * C.AMOUNT) + "₮";
+    document.getElementById("sTotal").textContent = U.fmt(total) + "₮";
     document.getElementById("sPeople").textContent = U.fmt(people);
     document.getElementById("sLeft").textContent = U.fmt(Math.max(GOAL - hearts, 0));
     for (let i = 0; i < GOAL; i++) {
@@ -102,13 +102,13 @@
     const nf = document.getElementById("neonFeed"); nf.innerHTML = "";
     recent.slice(0, 3).forEach((s, i) => {
       const li = document.createElement("li"); if (i < fresh) li.className = "fresh";
-      li.innerHTML = `<time>${U.time(s.created_at)}</time><span class="nm">${U.esc(U.mask(s.name))}</span><span class="pl">+${s.units} ♥</span>`;
+      li.innerHTML = `<time>${U.time(s.created_at)}</time><span class="nm">${U.esc(U.mask(s.name))}</span><span class="pl">+${U.fmt(s.units)} ♥</span>`;
       nf.appendChild(li);
     });
     const f = document.getElementById("feed"); f.innerHTML = "";
     recent.slice(0, 7).forEach((s, i) => {
       const li = document.createElement("li"); if (i < fresh) li.className = "fresh";
-      li.innerHTML = `<span class="who">❤ ${U.esc(U.mask(s.name))}${s.message ? " · " + U.esc(s.message) : ""}</span><time>${U.time(s.created_at)}</time>`;
+      li.innerHTML = `<span class="who">❤ ${U.esc(U.mask(s.name))}${s.units > 1 ? ` <b>+${U.fmt(s.units)}</b>` : ""}${s.message ? " · " + U.esc(s.message) : ""}</span><time>${U.time(s.created_at)}</time>`;
       f.appendChild(li);
     });
     const lm = recent.filter((s) => Date.now() - new Date(s.created_at).getTime() < 60000).reduce((a, s) => a + s.units, 0);
@@ -124,6 +124,7 @@
       e.style.animationDelay = i * 0.12 + "s"; e.style.fontSize = 18 + Math.random() * 26 + "px";
       fl.appendChild(e); setTimeout(() => e.remove(), 3800);
     }
+    document.querySelector("#toast .plus").textContent = "+" + U.fmt(s.units) + " ❤";
     document.getElementById("toastText").textContent = U.mask(s.name) + (s.message ? " — " + s.message : " дэмжлээ");
     const t = document.getElementById("toast"); t.classList.add("show");
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
@@ -132,9 +133,9 @@
   async function loadAll() {
     const [{ data: st }, { data: rows }] = await Promise.all([
       sb.rpc("get_stats"),
-      sb.from("supporters").select("id,name,message,units,created_at").order("id", { ascending: false }).limit(10),
+      sb.from("supporters").select("id,name,message,units,amount,created_at").order("id", { ascending: false }).limit(10),
     ]);
-    if (st && st[0]) { hearts = Number(st[0].hearts); people = Number(st[0].supporters); }
+    if (st && st[0]) { hearts = Number(st[0].hearts); people = Number(st[0].supporters); total = Number(st[0].total ?? hearts * C.AMOUNT); }
     if (rows) { recent = rows; rows.forEach((r) => seen.add(r.id)); }
     render(0);
   }
@@ -144,14 +145,17 @@
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "supporters" }, ({ new: s }) => {
       if (seen.has(s.id)) return;
       seen.add(s.id);
-      hearts += s.units; people += 1;
+      hearts += s.units; people += 1; total += Number(s.amount || s.units * C.AMOUNT);
       recent.unshift(s); recent = recent.slice(0, 10);
       render(1); celebrate(s);
     })
+    // Буцаасан/устгасан эсвэл дүнг зассан үед нийлбэрийг дахин уншина
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "supporters" }, () => loadAll())
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "supporters" }, () => { seen.clear(); loadAll(); })
     .subscribe();
 
   await loadAll();
-  setInterval(loadAll, 60000);             // холболт тасарсан ч минут тутам нийлбэрийг сэргээнэ
+  setInterval(loadAll, 30000);             // холболт тасарсан ч 30 секунд тутам нийлбэрийг сэргээнэ
   setInterval(() => renderFeeds(0), 5000); // "сүүлийн 1 минут" тоо
 
   document.getElementById("fs").onclick = () => {

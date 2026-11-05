@@ -260,3 +260,12 @@ input[type=text],select{font-size:16px}
 @media (max-width:600px){.q-item{grid-template-columns:1fr auto}.q-btns{grid-column:1/-1}.q-btns .btn{flex:1}}
 
 [hidden]{display:none!important}
+
+.btn.sm{padding:5px 9px;font-size:12px;min-height:0;border-radius:8px}
+.btn.danger{color:var(--bad)}
+.btn.danger:hover{border-color:var(--bad)}
+td.acts div{display:flex;gap:4px;white-space:nowrap}
+.q-count input{width:96px}
+.amount-chips{display:flex;flex-wrap:wrap;gap:6px}
+.amount-chips button{flex:1 1 auto}
+.amount-chips button[aria-pressed="true"]{background:var(--fg);color:#fff;border-color:var(--fg)}

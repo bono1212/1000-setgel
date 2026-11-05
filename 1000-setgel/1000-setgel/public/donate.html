@@ -61,12 +61,13 @@
           <input type="text" id="cName" maxlength="40" autocomplete="name" placeholder="Жишээ: Э.Оюун" required></div>
         <div><label for="cMsg">Багтаа хэлэх үг (заавал биш)</label>
           <input type="text" id="cMsg" maxlength="60" placeholder="Тайзыг эзэгнээрэй!"></div>
-        <div><label for="cCount">Шилжүүлсэн дүн</label>
-          <select id="cCount">
-            <option value="1">1,000₮ — 1 зүрх</option><option value="2">2,000₮ — 2 зүрх</option>
-            <option value="3">3,000₮ — 3 зүрх</option><option value="5">5,000₮ — 5 зүрх</option>
-            <option value="10">10,000₮ — 10 зүрх</option><option value="20">20,000₮ — 20 зүрх</option>
-          </select></div>
+        <div><label for="cAmount">Шилжүүлсэн дүн (₮)</label>
+          <div class="amount-chips" id="chips">
+            <button type="button" class="btn" data-v="1000">1,000₮</button><button type="button" class="btn" data-v="2000">2,000₮</button>
+            <button type="button" class="btn" data-v="5000">5,000₮</button><button type="button" class="btn" data-v="10000">10,000₮</button>
+          </div>
+          <input type="text" id="cAmount" inputmode="numeric" value="1000" style="margin-top:8px" aria-describedby="cHearts">
+          <span class="note" id="cHearts">= 1 зүрх</span></div>
         <input type="text" name="website" id="cWeb" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
         ${err ? `<div class="err">${U.esc(err)}</div>` : ""}
         <button class="btn primary lg" type="submit" id="sendBtn">Шилжүүлсэн ❤</button>
@@ -74,8 +75,18 @@
     if (keep) {
       document.getElementById("cName").value = keep.name || "";
       document.getElementById("cMsg").value = keep.message || "";
-      document.getElementById("cCount").value = keep.count || "1";
+      document.getElementById("cAmount").value = keep.amount || "1000";
     }
+    const amt = document.getElementById("cAmount");
+    const syncAmt = () => {
+      const n = parseInt(amt.value.replace(/[^\d]/g, ""), 10) || 0;
+      document.getElementById("cHearts").textContent = n >= C.AMOUNT
+        ? `= ${U.fmt(Math.floor(n / C.AMOUNT))} зүрх` : `Хамгийн багадаа ${U.fmt(C.AMOUNT)}₮`;
+      document.querySelectorAll("#chips button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.v) === n)));
+    };
+    amt.addEventListener("input", syncAmt);
+    document.querySelectorAll("#chips button").forEach((b) => (b.onclick = () => { amt.value = b.dataset.v; syncAmt(); }));
+    syncAmt();
     document.getElementById("cpAcct").onclick = (e) => U.copy(C.BANK_ACCOUNT.replace(/\s/g, ""), e.target);
     document.getElementById("cpNote").onclick = (e) => U.copy(C.BANK_NOTE, e.target);
     document.getElementById("cForm").addEventListener("submit", onSubmit);
@@ -86,17 +97,19 @@
     const d = {
       name: document.getElementById("cName").value.trim(),
       message: document.getElementById("cMsg").value.trim(),
-      count: document.getElementById("cCount").value,
+      amount: document.getElementById("cAmount").value.replace(/[^\d]/g, ""),
       website: document.getElementById("cWeb").value,
     };
     if (!d.name) return viewForm("Нэрээ оруулна уу.", d);
+    if ((parseInt(d.amount, 10) || 0) < C.AMOUNT) return viewForm(`Дүн хамгийн багадаа ${U.fmt(C.AMOUNT)}₮ байна.`, d);
     const btn = document.getElementById("sendBtn");
     btn.disabled = true; btn.textContent = "Илгээж байна…";
     try {
       const res = await fetch("/api/claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Алдаа гарлаа");
-      const claim = { id: data.id, name: d.name, count: Number(d.count), t: Date.now() };
+      const hearts = Math.floor(Number(d.amount) / C.AMOUNT);
+      const claim = { id: data.id, name: d.name, count: hearts, amount: Number(d.amount), t: Date.now() };
       store.set(claim);
       viewWaiting(claim);
     } catch (err) {
@@ -109,7 +122,7 @@
       <div class="success">
         <div class="spinner"></div>
         <h2>Баярлалаа, ${U.esc(c.name)}!</h2>
-        <p>Мэдэгдлийг хүлээн авлаа. Бид дансаа шалгаад баталгаажуулмагц таны ${c.count > 1 ? c.count + " зүрх" : "зүрх"} LIVE дэлгэц дээр тодорно.</p>
+        <p>Мэдэгдлийг хүлээн авлаа. Бид дансаа шалгаад баталгаажуулмагц таны ${c.count > 1 ? U.fmt(c.count) + " зүрх" : "зүрх"} LIVE дэлгэц дээр тодорно.</p>
         <p class="note">Энэ хуудсыг хааж болно.</p>
         <a class="btn lg" href="/" style="text-align:center;text-decoration:none">LIVE дэлгэц харах</a>
         <button class="btn" id="newBtn">Дахин дэмжих</button>
@@ -137,7 +150,7 @@
     try {
       const r = await fetch("/api/claim?id=" + encodeURIComponent(c.id)).then((x) => x.json());
       if (r.status === "paid") viewDone(c);
-      else if (r.status === "expired") { store.clear(); viewForm("Таны гүйлгээ дансанд олдсонгүй. Шилжүүлгээ шалгаад дахин мэдэгдэнэ үү."); }
+      else if (r.status === "expired" || r.status === "not_found") { store.clear(); viewForm("Таны гүйлгээ дансанд олдсонгүй. Шилжүүлгээ шалгаад дахин мэдэгдэнэ үү."); }
     } catch {}
   }
   function startPoll(c) { stopPoll(); pollTimer = setInterval(() => check(c), 10000); check(c); }
