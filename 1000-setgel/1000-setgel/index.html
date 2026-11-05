@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>1000 СЭТГЭЛ — LIVE</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&family=Nunito:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="floaters" id="floaters" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span class="plus">+1 ❤</span><span id="toastText"></span></div>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="brand"><img class="logo" src="logo.png" alt="ШУТИС ДаТС"><span class="brand-txt"><i>❤</i> 1000 СЭТГЭЛ</span></div>
+    <button class="btn" id="fs">Том дэлгэц</button>
+  </div>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <div class="live">
+    <div>
+      <div class="eyebrow"><span class="dot"></span> Шууд · Урлагийн их наадам</div>
+      <h1>ДҮҮРЭН ДЭМЖЛЭГ <em>1000 СЭТГЭЛ</em></h1>
+      <p class="sub">Нэг сургууль. Нэг баг. Мянган сэтгэл. Тайзан дээр тэд гарна, тэдний ард бид зогсоно.</p>
+
+      <div class="neon" role="group" aria-label="Шууд тоололт">
+        <div class="neon-top">
+          <div class="neon-main">
+            <span class="neon-tag"><span class="dot"></span>ШУУД ТООЛОЛТ</span>
+            <div class="neon-count">
+              <svg class="neon-heart" viewBox="0 0 24 22" aria-hidden="true"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5c7a"/><stop offset="1" stop-color="#d4102e"/></linearGradient></defs><path fill="url(#hg)" d="M12 21.6 10.3 20C4.2 14.5 0 10.7 0 6.1 0 2.6 2.7 0 6.2 0c1.9 0 3.8.9 5 2.4C12.4.9 14.2 0 16.2 0 19.7 0 22.4 2.6 22.4 6.1c0 4.6-4.2 8.4-10.3 13.9z"/></svg>
+              <span class="big" id="bigCount">0</span><span class="of">/ 1,000</span>
+              <svg class="neon-outline" viewBox="0 0 24 22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 20.3 10.9 19.3C5 14 1.2 10.5 1.2 6.1 1.2 3.3 3.4 1.2 6.2 1.2c1.6 0 3.2.8 4.2 2l1.6 1.9 1.6-1.9c1-1.2 2.6-2 4.2-2 2.8 0 5 2.1 5 4.9 0 4.4-3.8 7.9-9.7 13.2z"/></svg>
+            </div>
+          </div>
+          <div class="neon-recent"><span>Сүүлийн 1 минутад</span><b id="lastMin">+0</b><svg viewBox="0 0 24 22" aria-hidden="true"><path fill="currentColor" d="M12 21.6 10.3 20C4.2 14.5 0 10.7 0 6.1 0 2.6 2.7 0 6.2 0c1.9 0 3.8.9 5 2.4C12.4.9 14.2 0 16.2 0 19.7 0 22.4 2.6 22.4 6.1c0 4.6-4.2 8.4-10.3 13.9z"/></svg></div>
+          <ul class="neon-feed" id="neonFeed"></ul>
+        </div>
+        <div class="neon-bar" aria-hidden="true"><span id="meter"></span></div>
+      </div>
+
+      <div class="stats" style="margin-top:18px">
+        <div class="stat"><b id="sTotal">0₮</b><span>Нийт хандив</span></div>
+        <div class="stat"><b id="sPeople">0</b><span>Дэмжигч</span></div>
+        <div class="stat"><b id="sLeft">1,000</b><span>Зорилго хүртэл</span></div>
+      </div>
+      <div class="grid-wrap"><div class="hearts" id="hearts" role="img" aria-label="1000 зүрхний самбар"></div></div>
+      <div class="tags"><span>#1000Сэтгэл</span><span>#ДүүрэнДэмжлэг</span><span>#МанайБаг</span><span>#УрлагийнИхНаадам</span></div>
+    </div>
+
+    <aside class="side">
+      <div class="qr-card">
+        <h3>Уншуулаад 1,000₮ илгээ</h3>
+        <div id="screenQr"></div>
+        <div class="slogan">1 ОЮУТАН = 1,000₮ = 1 ДЭМЖЛЭГ</div>
+        <p id="donateUrl"></p>
+      </div>
+      <div class="feed"><h3>Сүүлийн дэмжигчид</h3><ul id="feed"></ul></div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+(async function () {
+  const C = window.APP_CONFIG, GOAL = C.GOAL;
+  const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+  let hearts = 0, people = 0, total = 0, recent = []; // recent: newest first
+  const seen = new Set();
+
+  // Зүрхний самбар
+  const grid = document.getElementById("hearts");
+  for (let i = 0; i < GOAL; i++) { const d = document.createElement("div"); d.className = "h"; grid.appendChild(d); }
+  const cells = grid.children;
+
+  new QRCode(document.getElementById("screenQr"), { text: C.DONATE_URL, width: 220, height: 220, colorDark: "#1b1f8f", colorLight: "#ffffff" });
+  document.getElementById("donateUrl").textContent = C.DONATE_URL.replace(/^https?:\/\//, "");
+
+  function render(fresh = 0) {
+    const shown = Math.min(hearts, GOAL);
+    const big = document.getElementById("bigCount");
+    big.textContent = U.fmt(hearts);
+    if (fresh) { big.classList.remove("bump"); void big.offsetWidth; big.classList.add("bump"); }
+    document.getElementById("meter").style.width = (shown / GOAL) * 100 + "%";
+    document.getElementById("sTotal").textContent = U.fmt(total) + "₮";
+    document.getElementById("sPeople").textContent = U.fmt(people);
+    document.getElementById("sLeft").textContent = U.fmt(Math.max(GOAL - hearts, 0));
+    for (let i = 0; i < GOAL; i++) {
+      const on = i < shown, c = cells[i];
+      if (on && !c.classList.contains("on")) { c.classList.add("on"); if (fresh) { c.classList.add("new"); setTimeout(() => c.classList.remove("new"), 1000); } }
+      else if (!on) c.classList.remove("on");
+    }
+    renderFeeds(fresh);
+  }
+
+  function renderFeeds(fresh = 0) {
+    const nf = document.getElementById("neonFeed"); nf.innerHTML = "";
+    recent.slice(0, 3).forEach((s, i) => {
+      const li = document.createElement("li"); if (i < fresh) li.className = "fresh";
+      li.innerHTML = `<time>${U.time(s.created_at)}</time><span class="nm">${U.esc(U.mask(s.name))}</span><span class="pl">+${U.fmt(s.units)} ♥</span>`;
+      nf.appendChild(li);
+    });
+    const f = document.getElementById("feed"); f.innerHTML = "";
+    recent.slice(0, 7).forEach((s, i) => {
+      const li = document.createElement("li"); if (i < fresh) li.className = "fresh";
+      li.innerHTML = `<span class="who">❤ ${U.esc(U.mask(s.name))}${s.units > 1 ? ` <b>+${U.fmt(s.units)}</b>` : ""}${s.message ? " · " + U.esc(s.message) : ""}</span><time>${U.time(s.created_at)}</time>`;
+      f.appendChild(li);
+    });
+    const lm = recent.filter((s) => Date.now() - new Date(s.created_at).getTime() < 60000).reduce((a, s) => a + s.units, 0);
+    document.getElementById("lastMin").textContent = "+" + lm;
+  }
+
+  let toastTimer;
+  function celebrate(s) {
+    const fl = document.getElementById("floaters");
+    for (let i = 0; i < 6; i++) {
+      const e = document.createElement("span"); e.className = "fl"; e.textContent = "❤";
+      e.style.left = 10 + Math.random() * 80 + "%"; e.style.setProperty("--r", Math.random() * 60 - 30 + "deg");
+      e.style.animationDelay = i * 0.12 + "s"; e.style.fontSize = 18 + Math.random() * 26 + "px";
+      fl.appendChild(e); setTimeout(() => e.remove(), 3800);
+    }
+    document.querySelector("#toast .plus").textContent = "+" + U.fmt(s.units) + " ❤";
+    document.getElementById("toastText").textContent = U.mask(s.name) + (s.message ? " — " + s.message : " дэмжлээ");
+    const t = document.getElementById("toast"); t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  async function loadAll() {
+    const [{ data: st }, { data: rows }] = await Promise.all([
+      sb.rpc("get_stats"),
+      sb.from("supporters").select("id,name,message,units,amount,created_at").order("id", { ascending: false }).limit(10),
+    ]);
+    if (st && st[0]) { hearts = Number(st[0].hearts); people = Number(st[0].supporters); total = Number(st[0].total ?? hearts * C.AMOUNT); }
+    if (rows) { recent = rows; rows.forEach((r) => seen.add(r.id)); }
+    render(0);
+  }
+
+  // Шинэ дэмжигч орж ирэхэд шууд (Supabase Realtime)
+  sb.channel("supporters-live")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "supporters" }, ({ new: s }) => {
+      if (seen.has(s.id)) return;
+      seen.add(s.id);
+      hearts += s.units; people += 1; total += Number(s.amount || s.units * C.AMOUNT);
+      recent.unshift(s); recent = recent.slice(0, 10);
+      render(1); celebrate(s);
+    })
+    // Буцаасан/устгасан эсвэл дүнг зассан үед нийлбэрийг дахин уншина
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "supporters" }, () => loadAll())
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "supporters" }, () => { seen.clear(); loadAll(); })
+    .subscribe();
+
+  await loadAll();
+  setInterval(loadAll, 30000);             // холболт тасарсан ч 30 секунд тутам нийлбэрийг сэргээнэ
+  setInterval(() => renderFeeds(0), 5000); // "сүүлийн 1 минут" тоо
+
+  document.getElementById("fs").onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+})();
+</script>
+</body>
+</html>
