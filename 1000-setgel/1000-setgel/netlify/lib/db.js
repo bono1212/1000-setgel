@@ -22,3 +22,12 @@ export const clean = (s, max) =>
     .slice(0, max);
 
 export const clampCount = (n, max = 100) => Math.max(1, Math.min(max, parseInt(n, 10) || 1));
+
+// Хандивын дүн (₮): хамгийн багадаа 1,000₮, дээд тал нь 10 сая ₮
+export const MAX_AMOUNT = 10_000_000;
+export function parseAmount(v, fallbackCount) {
+  let n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
+  if (!n && fallbackCount) n = AMOUNT * clampCount(fallbackCount);
+  if (!n || n < AMOUNT) return null;
+  return Math.min(n, MAX_AMOUNT);
+}
